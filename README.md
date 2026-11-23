@@ -1,16 +1,39 @@
-# ⚡ AniShift GitHub Actions Video Download Worker
+# ⚡ AniShift Video Download Cloud Worker
 
-මෙම Cloud Worker එක මගින් **VPS එකක් නැතුව** GitHub Actions (Parallel Runners 20ක් දක්වා) පාවිච්චි කරලා MegaPlay HLS streams 24-thread parallel download කරලා `ffmpeg` වලින් MP4 හදලා GitHub Releases CDN එකට upload කරයි.
+A high-performance, serverless MP4 packaging engine for AniShift.
+Automatically resolves MegaPlay HLS streams, downloads `.ts` segments in parallel (24 threads), remuxes them via `FFmpeg` (`+faststart`) into genuine `.mp4` files, and uploads them to GitHub Releases for full-speed CDN delivery.
 
 ---
 
-## 🚀 Setup කරන ආකාරය (Step-by-Step)
+## 🏗️ Architecture
 
-1. **GitHub Repository එකක් හදන්න:**
-   - GitHub එකේ අලුත් **Public** repository එකක් හදන්න (උදා: `anishift-dl-vault`).
-2. **Files ටික Push කරන්න:**
-   - මේ `cloud_worker` folder එක ඇතුළේ තියෙන files ඔක්කොම (`.github/workflows/download_video.yml`, `dl_worker.py`, `requirements.txt`) ඒ repo එකේ root එකට push කරන්න.
-3. **Cloudflare Worker (`download_worker/worker.js`) එකට Link කරන්න:**
-   - GitHub Settings -> Developer settings -> Personal access tokens (Fine-grained) වලින් `Actions: Read & Write` permission තියෙන token එකක් හදාගන්න.
-   - `download_worker` Cloudflare Worker එකේ `GITHUB_TOKEN` සහ `GITHUB_REPO` (`username/anishift-dl-vault`) environment variables දෙන්න.
+```mermaid
+graph TD
+    A[User: download.html] -->|1. Click Prepare Video| B[Cloudflare Worker: anishift-dl]
+    B -->|2. Trigger workflow_dispatch| C[GitHub Actions: download_video.yml]
+    C -->|3. Resolve & Fetch 24x Parallel| D[MegaPlay CDN / HLS]
+    C -->|4. Remux Faststart MP4| E[FFmpeg Engine: dl_worker.py]
+    E -->|5. Upload .mp4 Asset| F[GitHub Releases: dl-cache]
+    B -->|6. Check HEAD 200 & Redirect| F
+    F -->|7. Full-Speed CDN Download| A
+```
 
+---
+
+## 🔑 Cloudflare Worker Environment Variables
+
+When you deploy `download_worker/worker.js` to Cloudflare Workers, go to:
+**Settings ➔ Variables and Secrets ➔ Add** and configure:
+
+| Variable Name | Value Description | Purpose |
+| :--- | :--- | :--- |
+| `GITHUB_TOKEN` | Personal Access Token (`github_pat_...`) with `Actions: Read & Write` | Triggers `download_video.yml` workflow dispatches. |
+| `GITHUB_REPO` | Target GitHub repository (e.g., `vinothgeethika/as-hls-packager`) | Repository hosting the Cloud Worker & `dl-cache` Releases. |
+
+---
+
+## 🚀 GitHub Repository Setup
+
+1. Create a new **Public** GitHub repository (e.g., `as-hls-packager`).
+2. Push all files inside `cloud_worker/` (`dl_worker.py`, `requirements.txt`, `README.md`, and `.github/workflows/download_video.yml`) to the root of that repository.
+3. No extra GitHub Secrets are required — the workflow uses the built-in `${{ secrets.GITHUB_TOKEN }}` with `contents: write` permission to upload `.mp4` assets to the `dl-cache` release.
