@@ -1,0 +1,62 @@
+name: AniShift Video Download Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      anime_id:
+        description: "AniList Anime ID"
+        required: true
+      ep:
+        description: "Episode Number"
+        required: true
+        default: "1"
+      quality:
+        description: "Target Quality (e.g. 1080p, 720p)"
+        required: true
+        default: "1080p"
+      title:
+        description: "Anime Title"
+        required: false
+        default: "Anime"
+      movie:
+        description: "Is Movie (1 or 0)"
+        required: false
+        default: "0"
+      child_url:
+        description: "Direct Child M3U8 URL (Optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-mp4:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build & Upload MP4 to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python dl_worker.py \
+            --anime-id "${{ github.event.inputs.anime_id }}" \
+            --ep "${{ github.event.inputs.ep }}" \
+            --quality "${{ github.event.inputs.quality }}" \
+            --title "${{ github.event.inputs.title }}" \
+            --movie "${{ github.event.inputs.movie }}" \
+            --child-url "${{ github.event.inputs.child_url }}" \
+            --repo "${{ github.repository }}" \
+            --tag "dl-cache"
+
