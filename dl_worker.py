@@ -221,7 +221,11 @@ def main():
     if not token:
         raise RuntimeError("GITHUB_TOKEN is required")
 
-    asset_name = f"anishift_{args.anime_id}_ep{args.ep}_{args.quality}.mp4"
+    clean_t = str(args.title).replace('’', "'").replace('‘', "'").replace('“', '"').replace('”', '"')
+    safe_title = re.sub(r'[\\/*?:"<>|]', '', clean_t).strip().replace(' ', '_')
+    safe_title = re.sub(r'_+', '_', safe_title).strip('_')
+    safe_title = re.sub(r'[^\x20-\x7E]', '', safe_title).strip('_') or f"anime_{args.anime_id}"
+    asset_name = f"{safe_title}_{args.quality}.mp4" if str(args.movie) == "1" else f"{safe_title}_Ep_{args.ep}_{args.quality}.mp4"
     child_url = args.child_url.strip()
     if not child_url:
         master = resolve_master_m3u8(args.anime_id, args.ep, args.title)
