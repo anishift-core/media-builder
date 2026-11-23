@@ -84,6 +84,25 @@ def resolve_master_m3u8(anime_id, ep_num, title):
     raise RuntimeError("Failed to resolve master.m3u8")
 
 
+def get_healthy_mirrors():
+    mirrors = []
+    failed = set()
+    try:
+        r = requests.get("https://megaplay.buzz/lib/check_domain.json", headers=MEGAPLAY_HEADERS, timeout=6)
+        if r.ok:
+            d = r.json()
+            if d.get("fallback"):
+                mirrors.append(str(d["fallback"]).lower().replace("https://", "").replace("http://", "").split("/")[0].strip())
+            for f in d.get("failed", []):
+                failed.add(str(f).lower().replace("https://", "").replace("http://", "").split("/")[0].strip())
+    except Exception:
+        pass
+    for m in ["xdw5v.qeltrix.top", "fetch.nexabloom.top"]:
+        if m not in mirrors:
+            mirrors.append(m)
+    return mirrors, failed
+
+
 def get_segments(child_url):
     res = requests.get(child_url, headers=MEGAPLAY_HEADERS, timeout=12)
     res.raise_for_status()
@@ -97,6 +116,8 @@ def get_segments(child_url):
 def build_mp4(segments, out_mp4_path):
     tmp_dir = tempfile.mkdtemp(prefix="as_dl_")
     tl = threading.local()
+    mirrors, failed_hosts = get_healthy_mirrors()
+    from urllib.parse import urlparse
 
     def get_sess(reset=False):
         if reset or not hasattr(tl, "s"):
@@ -112,9 +133,18 @@ def build_mp4(segments, out_mp4_path):
         p = os.path.join(tmp_dir, f"seg_{idx:05d}.ts")
         if os.path.isfile(p) and os.path.getsize(p) > 512:
             return
+        parsed = urlparse(url)
+        candidate_urls = [url]
+        if "/anime/" in parsed.path:
+            healed = [f"https://{m}{parsed.path}{('?' + parsed.query) if parsed.query else ''}" for m in mirrors]
+            if parsed.hostname and parsed.hostname.lower() in failed_hosts:
+                candidate_urls = healed + [url]
+            else:
+                candidate_urls = [url] + [u for u in healed if u != url]
         for a in range(attempts):
+            target_u = candidate_urls[a % len(candidate_urls)]
             try:
-                r = get_sess(reset=(a >= 2)).get(url, timeout=(5, 10))
+                r = get_sess(reset=(a >= 2)).get(target_u, timeout=(5, 10))
                 if r.status_code == 200 and len(r.content) > 512:
                     with open(p, "wb") as f:
                         f.write(r.content)
