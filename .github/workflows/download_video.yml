@@ -30,12 +30,19 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: dl-${{ github.event.inputs.anime_id }}-${{ github.event.inputs.ep }}-${{ github.event.inputs.quality }}
+  cancel-in-progress: false
+
 jobs:
   build-mp4:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
       - name: Setup Python
         uses: actions/setup-python@v5
